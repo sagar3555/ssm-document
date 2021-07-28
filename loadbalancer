@@ -1,0 +1,220 @@
+######## S3 #######################
+resource "aws_s3_bucket" "xecmbucket" {
+  bucket = "s3-ew1-xecm-v-content-store"
+  acl    = "private"
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        kms_master_key_id = var.s3_kms_key_arn
+        sse_algorithm     = "aws:kms"
+      }
+    }
+  }
+  tags = var.s3_tags 
+}
+
+resource "aws_s3_bucket_public_access_block" "example" {
+  bucket = aws_s3_bucket.xecmbucket.id
+
+  block_public_acls   = true
+  block_public_policy = true
+  restrict_public_buckets = true
+  ignore_public_acls = true 
+}
+
+resource "aws_s3_bucket_policy" "xecm_s3_bucket_policy" {
+  bucket = "${aws_s3_bucket.xecmbucket.id}"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::940449803813:user/Venkata.mandali-ext@solvay.com"
+      },
+      "Action": [ 
+            "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+        ],
+      "Resource": [
+        "arn:aws:s3:::s3-ew1-xecm-v-content-store/*",
+        "arn:aws:s3:::s3-ew1-xecm-v-content-store"
+      ]
+    }
+  ]
+}
+EOF
+}
+module alb {
+  source = "../../../../resource_module/ALB"
+  name               = var.name
+  internal           = var.internal
+  load_balancer_type = var.load_balancer_type
+  security_group    = concat(var.vpc_security_group_ids, [module.ALB-security-group.id])
+  subnets            = [element(data.terraform_remote_state.xecm.outputs.database_subnets, local.availability_zones[upper(var.xecm_availability_zone)]),element(data.terraform_remote_state.xecm.outputs.database_subnets, local.availability_zones[upper(var.xecm_availability_zone_1)])]
+  tags = var.tags
+}
+
+module alb_listener1 {
+  source = "../../../../resource_module/ALB_listener"
+  load_balancer_arn = module.alb.alb_arn
+  listener_port              = var.listener_port
+  listener_protocol          = var.listener_protocol
+  ssl_policy                 = ""
+  certificate_arn            = ""
+  target_group_arn =  module.targetgroup1.targetgroup_arn
+}
+
+module alb_listener_rule {
+  source = "../../../../resource_module/ALB_listener_rule"
+  listener_arn            = module.alb_listener1.listener_arn
+  target_group_arn        = module.targetgroup1.targetgroup_arn
+  value                   = ["/otcs/*", "/cws/*"]
+  priority                = "100"
+  }
+
+module alb_listener_rule1 {
+  source = "../../../../resource_module/ALB_listener_rule"
+  listener_arn            = module.alb_listener1.listener_arn
+  target_group_arn        = module.targetgroup2.targetgroup_arn
+  value                   = ["/QueueServer/*"]
+  priority                = "99"
+}
+
+module alb_listener_rule2 {
+  source = "../../../../resource_module/ALB_listener_rule"
+  listener_arn            = module.alb_listener1.listener_arn
+  target_group_arn        = module.targetgroup3.targetgroup_arn
+  value                   = ["/otdsws/*"]
+  priority                = "98"
+}
+module alb_listener_rule3 {
+  source = "../../../../resource_module/ALB_listener_rule"
+  listener_arn            = module.alb_listener1.listener_arn
+  target_group_arn        = module.targetgroup4.targetgroup_arn
+  value                   = ["/archive/*"]
+  priority                = "95"
+}
+module targetgroup1 {
+  source = "../../../../resource_module/ALB_targetgroup"
+  name              = var.targetgroup_01      
+  targetgroup_port  = var.targetgroup_port
+  targetgroup_protocol  = var.targetgroup_protocol
+  target_type           = var.target_type
+  vpc_id            = data.terraform_remote_state.xecm.outputs.vpc_id
+  targetgroup_tags  = var.tags
+  healthy_threshold = var.healthy_threshold
+  interval         = var.interval
+  path             = var.path_01
+  health_check_port             = var.health_check_port
+  health_check_protocol         = var.health_check_protocol
+  timeout          = var.timeout
+  unhealthy_threshold = var.unhealthy_threshold
+}
+module targetgroup2 {
+  source = "../../../../resource_module/ALB_targetgroup"
+  name              = var.targetgroup_02      
+  targetgroup_port  = var.targetgroup_port1
+  targetgroup_protocol  = var.targetgroup_protocol
+  target_type           = var.target_type
+  vpc_id            = data.terraform_remote_state.xecm.outputs.vpc_id
+  targetgroup_tags  = var.tags
+  healthy_threshold = var.healthy_threshold
+  interval         = var.interval
+  path             = var.path_02
+  health_check_port             = var.health_check_port1
+  health_check_protocol         = var.health_check_protocol
+  timeout          = var.timeout
+  unhealthy_threshold = var.unhealthy_threshold
+}
+module targetgroup3 {
+  source = "../../../../resource_module/ALB_targetgroup"
+  name              = var.targetgroup_03      
+  targetgroup_port  = var.targetgroup_port2
+  targetgroup_protocol  = var.targetgroup_protocol
+  target_type           = var.target_type
+  vpc_id            = data.terraform_remote_state.xecm.outputs.vpc_id
+  targetgroup_tags  = var.tags
+  healthy_threshold = var.healthy_threshold
+  interval         = var.interval
+  path             = var.path_03
+  health_check_port             = var.health_check_port2
+  health_check_protocol         = var.health_check_protocol
+  timeout          = var.timeout
+  unhealthy_threshold = var.unhealthy_threshold
+}
+module targetgroup4 {
+  source = "../../../../resource_module/ALB_targetgroup"
+  name              = var.targetgroup_04      
+  targetgroup_port  = var.targetgroup_port2
+  targetgroup_protocol  = var.targetgroup_protocol
+  target_type           = var.target_type
+  vpc_id            = data.terraform_remote_state.xecm.outputs.vpc_id
+  targetgroup_tags  = var.tags
+  healthy_threshold = var.healthy_threshold
+  interval         = var.interval
+  path             = var.path_04
+  health_check_port             = var.health_check_port2
+  health_check_protocol         = var.health_check_protocol
+  timeout          = var.timeout
+  unhealthy_threshold = var.unhealthy_threshold
+}
+module targetgroup_attachment1 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup1.targetgroup_arn
+  target_group_id        = var.target_group_id_01
+  port             = var.targetgroup_att_port
+}
+module targetgroup_attachment2 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup1.targetgroup_arn
+  target_group_id         = var.target_group_id_02
+  port             = var.targetgroup_att_port
+}
+module targetgroup_attachment3 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup2.targetgroup_arn
+  target_group_id        = var.target_group_id_03
+  port             = var.targetgroup_att_port1
+}
+module targetgroup_attachment4 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup2.targetgroup_arn
+  target_group_id        = var.target_group_id_04
+  port             = var.targetgroup_att_port1
+}
+module targetgroup_attachment5 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup3.targetgroup_arn
+  target_group_id       = var.target_group_id_05
+  port             = var.targetgroup_att_port2
+}
+module targetgroup_attachment6 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup3.targetgroup_arn
+  target_group_id        = var.target_group_id_06
+  port             = var.targetgroup_att_port2
+}
+module targetgroup_attachment7 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup4.targetgroup_arn
+  target_group_id        = var.target_group_id_07
+  port             = var.targetgroup_att_port2
+}
+module targetgroup_attachment8 {
+  source = "../../../../resource_module/ALB_targetgroup_attachment"
+  target_group_arn = module.targetgroup4.targetgroup_arn
+  target_group_id        = var.target_group_id_08
+  port             = var.targetgroup_att_port2
+}
+module "ALB-security-group" {
+  source                                = "git::https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/terraform-module-securitygroup.git?ref=v0.1.1"
+  vpc_id                                = data.terraform_remote_state.xecm.outputs.vpc_id
+  name                                  = local.scg_name
+  tags                                  = merge(var.tags, { Name = local.scg_name })
+  ingress_with_cidr_blocks              = var.sec_group_ingress_with_cidr_blocks
+  egress_with_cidr_blocks            = var.sec_group_egress_with_cidr_blocks
+}
