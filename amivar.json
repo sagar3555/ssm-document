@@ -1,0 +1,16 @@
+{
+  "aws_region": "eu-west-1",
+  "base_ami": " ami-00044f922345e6b31",
+  "instance_type": "t2.micro",
+  "name": "Windows 2019 Golden AMI",
+  "ssh_username": "Administrator",
+  "tag_name": "Packer Builder win_2019_ami",
+  "ami_type": "win_2019_ami",
+  "vpc_id": "vpc-015a9345db5da6bde",
+  "subnet_id": "subnet-0584f9dd12c6978cd",
+  "AWS_security_group_id": "sg-00f4ae3393e5f6f7a",
+  "kms_key_id": "",
+  "aws_access_key": "",
+  "aws_secret_key": "",
+  "aws_security_token": ""
+}
