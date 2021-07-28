@@ -1,0 +1,248 @@
+{
+  "variables": {
+    "aws_region": "",
+    "base_ami":"",
+    "instance_type": "",
+    "name": "",
+    "tag_name": "",
+    "ami_type": "",
+    "vpc_id": "",
+    "subnet_id": "",
+    "aws_access_key": "",
+    "aws_secret_key": "",
+    "aws_security_token": "",
+    "AWS_security_group_id": "",
+    "vm-disk-size": "104857",
+    "Admin_Root": "c:/admin",
+    "DSCScripts_Dir": "{{user `Admin_Root`}}/DSC_Resources",
+    "Admin_Temp": "{{user `Admin_Root`}}/Tmp",
+    "GLOBAL_DSC_Script": "{{user `DSCScripts_Dir`}}/GlobalIRIS.ps1",
+    "SOLVAY_KEY": "Solvay",
+    "IRIS_KEY": "IRIS",
+    "IRIS_SOFTWARE_KEY": "Softwares",
+    "IRIS_Full_Key": "HKey_Local_Machine\\Software\\{{user `SOLVAY_KEY`}}\\{{user `IRIS_KEY`}}",
+    "IRIS_BUILD_KEY": "{{user `IRIS_Full_Key`}}\\BUILD",
+    "os_iso_url": "{{user `ISODISK`}}",
+    "ssh-username": "solvay",
+      "ssh-password": "solvay",
+      "boot_wait": "10s",
+      "numvcpus": "2",
+      "alma_ssh_username": "root",
+      "alma_ssh_password": "gTGjOQHnGLL9so71B2POk0vBKlvBui"
+  },
+  "builders": [
+    {
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "token": "{{user `aws_security_token`}}",
+      "name": "{{user `name`}}_{{timestamp}}",
+      "type": "amazon-ebs",
+      "encrypt_boot": true,
+      "kms_key_id": "{{user `kms_key_id`}}",
+      "region": "{{user `aws_region`}}",
+      "instance_type": "{{user `instance_type`}}",
+      "user_data_file": "./aws_scripts/pws-userdata.ps1",
+      "source_ami": "{{user `base_ami`}}",
+      "ami_name": "{{user `ami_type`}}_{{isotime \"02Jan2006_1504\"}}",
+      "ami_description": "{{user `tag_name`}}",
+      "vpc_id": "{{user `vpc_id`}}",
+      "subnet_id": "{{user `subnet_id`}}",
+      "security_group_id": "{{user `AWS_security_group_id`}}",
+      "communicator": "winrm",
+      "winrm_timeout": "15m",
+      "winrm_port": 5986,
+      "winrm_username": "Administrator",
+      "associate_public_ip_address": "true",
+      "winrm_use_ssl": true,
+      "winrm_insecure": true,
+      "insecure_skip_tls_verify": true,
+      "ssh_interface": "private_ip",
+     
+
+      "run_tags": {
+          "Name": "{{user `tag_name`}}",
+          "builder": "packer",
+          "buildTime": "{{isotime \"2006-01-02T03_04\"}}",
+          "baseAMI": "{{user `base_ami`}}"
+      },
+      "tags": {
+          "BuildRegion": "{{ .BuildRegion}}",
+          "SourceAMI": "{{ .SourceAMI }}",
+          "SourceAMIName": "{{ .SourceAMIName }}",
+          "BuildTime": "{{isotime \"2006-01-02T03_04\"}}",
+          "Name": "{{user `name`}}_{{timestamp}}",
+          "OS": "Windows"
+      }
+    }
+  ],
+  "provisioners": [
+    
+    {
+      "type": "powershell",
+      "scripts": [
+          "{{template_dir}}/provisioners/install-cloudwatch-log-agent.ps1"
+      ]
+    },
+    {
+      "type": "powershell",
+      "scripts": [
+          "{{template_dir}}/provisioners/install-inspector-agent.ps1"
+      ]
+    },
+    {
+        "destination": "$Env:ProgramData/Amazon/AmazonCloudWatchAgent/",
+        "source": "amazon-cloudwatch-agent.json",
+        "type": "file"
+    },
+    {
+      "type": "powershell",
+      "scripts": [
+        "{{template_dir}}/provisioners/configure-cloudwatch-log-agent.ps1"
+      ]
+    },
+    {
+      "type": "windows-restart",
+      "restart_check_command": "powershell -command \"& {Write-Output 'restarted.'}\""
+    },
+    {
+      "type": "file",
+      "source": "{{template_dir}}/provisioners/Update-DNSSuffixSearchList.ps1",
+      "destination": "C:/temp/Update-DNSSuffixSearchList.ps1",
+      "direction": "upload"
+     },
+     {
+      "type": "powershell",
+      "inline": [
+         "C:/temp/Update-DNSSuffixSearchList.ps1 -DNSSuffix 'eua.solvay.com','solvay.com','ist-priv.rhodia.com','cytec.com' -LogActionsTo C:/temp/Update-DNSSuffixSearchList.log"
+       ]
+    },
+   
+    {
+      "type": "file",
+      "source": "./config/DSC_Resources",
+      "destination": "$env:TEMP\\DSC_Resources"
+    },
+    {
+      "type": "file",
+      "source": "./DSC_Resources/",
+      "destination": "$env:TEMP"
+    },
+    {
+      "type": "powershell",
+      "environment_vars": [
+        "Admin_Root={{user `Admin_Root`}}",
+        "Admin_Temp={{user `Admin_Temp`}}",
+        "DSCScripts_Dir={{user `DSCScripts_Dir`}}",
+        "IRIS_Full_Key={{user `IRIS_Full_Key`}}",
+        "IRIS_BUILD_KEY={{user `IRIS_BUILD_KEY`}}","BeVerbose=False",
+        "ISO_IMAGE={{user `os_iso_url`}}",
+        "GLOBAL_DSC_Script={{user `GLOBAL_DSC_Script`}}",
+        "SYSTEM_DISK_SIZE={{user `vm-disk-size`}}"
+      ],
+      "scripts": [
+        "./scripts/OS-Configuration.ps1",
+        "./scripts/DisableServerManagerOnLogon.ps1",
+        "./scripts/copy_.NET-Framework35-Sources.ps1",
+        "./scripts/Initialize_DSC_GlobalScript.ps1",
+        "./scripts/Generate_DSC_GlobalScript.ps1",
+        "./scripts/register_IRIS_Version.ps1",
+        "./scripts/Finalize_DSC_GlobalScript.ps1",
+        "./scripts/Execute_DSC_GlobalScript.ps1"
+      ]
+    },
+    {
+      "type": "windows-restart",
+      "restart_timeout": "10m",
+      "pause_before": "10s"
+    },
+  
+    {
+      "type": "file",
+      "source": "./config/IRIS_Softwares",
+      "destination": "$env:TEMP\\IRIS_Softwares"
+    },
+    {
+      "type": "powershell",
+      "environment_vars": [
+        "BeVerbose=False",
+        "SOLVAY_KEY={{user `SOLVAY_KEY`}}",
+        "IRIS_KEY={{user `IRIS_KEY`}}",
+        "IRIS_SOFTWARE_KEY={{user `IRIS_SOFTWARE_KEY`}}"
+      ],
+      "valid_exit_codes": [0,3010,4294967295],
+      "scripts": [
+        "./scripts/install.ps1",
+        "./scripts/Change-Chocolatey-Sources.ps1",
+        "./scripts/Install-CHOCO-Softwares.ps1"
+      ]
+    },
+    {
+      "type": "windows-shell",
+      "script": "./scripts/OS-Configuration.cmd",
+      "valid_exit_codes": [0]
+    },
+    {
+      "type": "windows-restart",
+      "restart_timeout": "20m",
+      "pause_before": "20s"
+    },
+    {
+      "type": "windows-shell",
+      "environment_vars": [
+        "Admin_Root={{user `Admin_Root`}}",
+        "Admin_Temp={{user `Admin_Temp`}}"
+      ],
+      "script": "./scripts/IRIS-misc.cmd",
+      "valid_exit_codes": [0]
+    },   
+    {
+      "type": "file",
+      "source": "./scripts/AWS_SetupComplete.cmd",
+      "destination": "C:\\Windows\\Setup\\Scripts\\SetupComplete.cmd"
+      
+    },
+    {
+      "type": "file",
+      "source": "./scripts/qualys_inst.cmd",
+      "destination": "C:\\Windows\\Setup\\Scripts\\qualys_inst.cmd"
+      
+    },
+   
+    {
+      "type": "powershell",
+      "scripts": [
+        "./scripts/CleanWindowsimage.ps1",
+        "./scripts/Remediate_Get-WindowsUpdateLog.ps1"
+      ]
+    },
+    {
+      "type": "windows-restart",
+      "restart_timeout": "20m",
+      "pause_before": "10s"
+    },
+    {
+      "type": "powershell",
+      "environment_vars": [
+        "Admin_Root={{user `Admin_Root`}}",
+        "Admin_Temp={{user `Admin_Temp`}}"
+      ],
+      "scripts": [
+        "./scripts/install-Qualys-CloudAgent.ps1",
+        "./scripts/install-Tanium-Agent.ps1"
+      ]
+    },
+    {
+      "type": "powershell",
+      "script": "./scripts/SEP-PREP.ps1"
+    },
+    {
+      "type": "powershell",
+      "inline": [
+        "C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SendWindowsIsReady.ps1 -Schedule",
+        "C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
+        "C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown"
+      ]
+      
+    }
+  ]
+}
