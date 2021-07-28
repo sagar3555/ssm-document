@@ -1,0 +1,15 @@
+{
+  "aws_region": "eu-west-1",
+  "base_ami": "ami-8cff51fb",
+  "instance_type": "t2.micro",
+  "name": "RHEL 7 Golden AMI",
+  "ssh_username": "ec2-user",
+  "tag_name": "Packer Builder RHEL7",
+  "ami_type": "rhel_7_ami",
+  "vpc_id": "vpc-015a9345db5da6bde",
+  "subnet_id": "subnet-0b7a0b8429fc7a79b",
+  "kms_key_id": "",
+  "aws_access_key": "",
+  "aws_secret_key": "",
+  "aws_security_token": ""
+}
