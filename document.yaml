@@ -1,0 +1,31 @@
+schemaVersion: '2.2'
+description: Run a PowerShell script to securely domain-join a Windows instance
+parameters:
+  ssmUsername:
+    type: String
+    description: "(Required) Name of the SSM parameter containing the username of the user needed to join the domain"
+  ssmPassword:
+    type: String
+    description: "(Required) Name of the SSM parameter containing the password of the user needed to join the domain"
+  ouPath:
+    type: String
+    description: "(Required) Organizational unit path where the domain member will join"
+  domain:
+    type: String
+    description: "(Required) Domain name to join"
+  hostname:
+    type: String
+    description: "(Required) New Hostname"
+mainSteps:
+  - action: aws:runPowerShellScript
+    name: runPowerShellWithSecureString
+    inputs:
+      runCommand:
+      - "Write-Host Getting SSM Parameters"
+      - "$username = (Get-SSMParameterValue -Name {{ ssmUsername }} -WithDecryption $True).Parameters[0].Value"
+      - "$password = (Get-SSMParameterValue -Name {{ ssmPassword }} -WithDecryption $True).Parameters[0].Value | ConvertTo-SecureString -asPlainText -Force"
+      - "$credential = New-Object System.Management.Automation.PSCredential($username,$password)"
+      - "Write-Host Joining machine to domain"
+      - "Add-Computer -DomainName {{ domain }} -OUPath \"{{ ouPath }}\" -NewName \"{{ hostname }}\" -Credential $credential -Restart"
+      - "Write-Host Adding AC_GG_RPA_Admins and EUA\PT99376143 to local admins"
+      - "Add-LocalGroupMember -Name Administrators -Member EUA\\AC_GG_INFY_SAP"
