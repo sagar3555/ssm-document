@@ -1,0 +1,70 @@
+{
+  "variables": {
+    "aws_region": "",
+    "base_ami":"",
+    "instance_type": "",
+    "builder_name": "",
+    "ssh_username": "",
+    "tag_name": "",
+    "ami_type": "",
+    "vpc_id": "",
+    "subnet_id": "",
+    "kms_key_id": "",
+    "aws_access_key": "",
+    "aws_secret_key": "",
+    "aws_security_token": ""
+  },
+  "builders": [
+    {
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "token": "{{user `aws_security_token`}}",
+      "name": "{{user `builder_name`}}",
+      "type": "amazon-ebs",
+      "encrypt_boot": true,
+      "kms_key_id": "{{user `kms_key_id`}}",
+      "region": "{{user `aws_region`}}",
+      "instance_type": "{{user `instance_type`}}",
+      "ssh_username": "{{user `ssh_username`}}",
+      "ssh_pty": true,
+      "source_ami": "{{user `base_ami`}}",
+      "ami_name": "{{user `ami_type`}}_{{isotime \"02Jan2006_1504\"}}",
+      "ami_description": "{{user `tag_name`}}",
+      "vpc_id": "{{user `vpc_id`}}",
+      "subnet_id": "{{user `subnet_id`}}",
+      "run_tags": {
+          "Name": "{{user `tag_name`}}",
+          "builder": "packer",
+          "buildTime": "{{isotime \"2006-01-02T03_04\"}}",
+          "baseAMI": "{{user `base_ami`}}"
+      },
+      "associate_public_ip_address": "true"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": [
+        "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done"
+      ]
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "sudo yum update -y && sudo yum install python2 -y && curl https://bootstrap.pypa.io/get-pip.py -O && sudo python get-pip.py && sudo pip install ansible"
+      ]
+    },
+    {
+      "type": "ansible-local",
+      "playbook_file": "../../ansible/{{user `ami_type`}}/playbook.yml",
+      "playbook_dir": "../../ansible"
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "manifest",
+      "output": "manifest.json",
+      "strip_path": true
+    }
+  ]
+}
